@@ -1,0 +1,7 @@
+.gradle
+.idea
+*.iml
+build
+credentials.json
+tokens
+src/main/java/resources/credentials.json
