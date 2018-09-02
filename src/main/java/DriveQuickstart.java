@@ -63,6 +63,47 @@ public class DriveQuickstart {
         return getGoogleSubFolders(service, null);
     }
 
+    public static List<File> getGoogleFolder(Drive driveService, String folderName) throws IOException {
+        String pageToken = null;
+
+        List<File> list = new ArrayList<>();
+
+        String query = " name contains '" + folderName + "' "
+                + " and mimeType = 'application/vnd.google-apps.folder' ";
+
+        do {
+            FileList result = driveService.files().list().setQ(query).setSpaces("drive")
+                    .setFields("nextPageToken, files(id, name, createdTime)")
+                    .setPageToken(pageToken).execute();
+            for (File file : result.getFiles()) {
+                list.add(file);
+            }
+            pageToken = result.getNextPageToken();
+        } while (pageToken != null);
+
+        return list;
+    }
+
+    public static List<File> getGoogleChildrenFiles(Drive driveService, String googleFolderIdParent) throws IOException {
+        String pageToken = null;
+        List<File> list = new ArrayList<>();
+
+        String query = " mimeType != 'application/vnd.google-apps.folder' "
+                    + " and '" + googleFolderIdParent + "' in parents";
+
+        do {
+            FileList result = driveService.files().list().setQ(query).setSpaces("drive")
+                    .setFields("nextPageToken, files(id, name, createdTime)")
+                    .setPageToken(pageToken).execute();
+            for (File file : result.getFiles()) {
+                list.add(file);
+            }
+            pageToken = result.getNextPageToken();
+        } while (pageToken != null);
+
+        return list;
+    }
+
     public static final List<File> getGoogleSubFolders(Drive driveService, String googleFolderIdParent) throws IOException {
         String pageToken = null;
         List<File> list = new ArrayList<File>();
@@ -117,7 +158,6 @@ public class DriveQuickstart {
      * @throws GeneralSecurityException
      */
     public static void main(String[] args) throws IOException, GeneralSecurityException {
-
         if(args.length != 1) {
             System.out.println(Arrays.toString(args));
             System.out.println("Please, provide the filename that you want to download");
@@ -128,13 +168,21 @@ public class DriveQuickstart {
         Drive service = new Drive.Builder(HTTP_TRANSPORT, JSON_FACTORY, getCredentials(HTTP_TRANSPORT))
                 .setApplicationName(APPLICATION_NAME).build();
 
-        List<File> rootGoogleFolders = getGoogleFilesByName(service, args[0]);
-        for (File folder : rootGoogleFolders) {
-            System.out.println("Mime Type: " + folder.getMimeType() +
-                    " --- Name: " + folder.getName() +
-                    " --- Id: " + folder.getId());
-            downloadFile(service, folder.getId(), folder.getName());
+
+        List<File> rootGoogleFolders = getGoogleFolder(service, args[0]);
+        if (rootGoogleFolders.size() == 0) {
+            System.out.println("FolderId hasn't been found by name " + args[0]);
+            return;
         }
+
+        List<File> childrenFiles = getGoogleChildrenFiles(service, rootGoogleFolders.get(0).getId());
+        for (File file : childrenFiles) {
+            System.out.println(
+                    " --- Name: " + file.getName() +
+                    " --- Id: " + file.getId());
+            downloadFile(service, file.getId(), file.getName());
+        }
+
         System.out.println("Done!");
     }
 }
